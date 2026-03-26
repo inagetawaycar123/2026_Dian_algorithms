@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from model.MLP import MLP
 from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 import pandas as pd
 
 
@@ -11,7 +12,7 @@ def main():
     input_dim = 4
     hidden_dim = 16
     output_dim = 3
-    epochs = 50
+    epochs = 300
 
     print("脚本开始运行，准备构建模型和加载数据...")
 
@@ -33,16 +34,24 @@ def main():
     encoder = LabelEncoder()
     y_data = encoder.fit_transform(y_data)
 
-    # 转化为pytorch向量
-    x = torch.tensor(x_data, dtype=torch.float32)
-    labels = torch.tensor(y_data, dtype=torch.long)
+    # 划分训练集和测试集
+    X_train, X_test, y_train, y_test = train_test_split(
+        x_data, y_data, test_size=0.2, random_state=42  # 20% 用于测试
+    )
+
+    # 转 PyTorch 张量
+    X_train = torch.tensor(X_train, dtype=torch.float32)
+    y_train = torch.tensor(y_train, dtype=torch.long)
+    X_test = torch.tensor(X_test, dtype=torch.float32)
+    y_test = torch.tensor(y_test, dtype=torch.long)
+
 
     # 训练循环
     for epoch in range(epochs):
         model.train()
 
-        logits, softmax_output = model(x)
-        loss = criterion(logits, labels)
+        logits, softmax_output = model(X_train)
+        loss = criterion(logits, y_train)
 
         optimizer.zero_grad()  # 清空上一轮的梯度
         loss.backward()  # 反向传播计算梯度
@@ -51,6 +60,17 @@ def main():
         print(f"Epoch [{epoch + 1}/{epochs}], Loss: {loss.item():.4f}")
 
     print("训练结束。")
+
+    print("\n========== 测试集结果 ==========")
+    model.eval()  # 测试模式
+    with torch.no_grad():  # 不计算梯度
+        logits, softmax_output = model(X_test)
+        _, predicted = torch.max(softmax_output, 1)  # 预测类别
+        correct = (predicted == y_test).sum().item()
+        acc = correct / len(y_test)
+
+    print(f"测试集正确数量: {correct}/{len(y_test)}")
+    print(f"测试集准确率: {acc*100:.2f}%")
 
 
 if __name__ == "__main__":
